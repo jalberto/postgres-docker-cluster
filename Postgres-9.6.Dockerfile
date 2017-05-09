@@ -3,7 +3,7 @@ ARG POSTGRES_VERSION=9.6
 ARG DOCKERIZE_VERSION=v0.2.0
 
 RUN echo deb http://debian.xtdv.net/debian jessie main > /etc/apt/sources.list && apt-get update --fix-missing && \
-    apt-get install -y postgresql-server-dev-$POSTGRES_VERSION postgresql-$POSTGRES_VERSION-repmgr wget
+    apt-get install -y postgresql-server-dev-$POSTGRES_VERSION postgresql-$POSTGRES_VERSION-repmgr wget openssh-server
 
 RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
@@ -77,6 +77,17 @@ RUN chmod -R +x /usr/local/bin/cluster
 RUN ln -s /usr/local/bin/cluster/functions/* /usr/local/bin/
 COPY ./pgsql/configs /var/cluster_configs
 
+# Need SSH for cross connections
+RUN mkdir /var/run/sshd && sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+ENV NOTVISIBLE "in users profile"
+RUN echo "export VISIBLE=now" >> /etc/profile
+
+COPY ./pgsql/ssh /home/postgres/.ssh
+
+EXPOSE 22
 EXPOSE 5432
 
 VOLUME /var/lib/postgresql/data
